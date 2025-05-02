@@ -9,37 +9,41 @@ import { Parcel, TimeSlot } from '@/context/ParcelContext';
 import ParcelCard from '@/components/ParcelCard';
 import TimeSlotSelector from '@/components/TimeSlotSelector';
 import LoadingSpinner from '@/components/LoadingSpinner';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { useAuth } from '@/context/AuthContext';
 
 const ReceiverModule = () => {
   const { state, dispatch } = useParcelContext();
   const { toast } = useToast();
-  const [receiverId, setReceiverId] = useState<string>('user1'); // Default to first user for demo
-  const [recommendedSlots, setRecommendedSlots] = useState<TimeSlot[]>([]);
+  const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [selectingSlotForParcel, setSelectingSlotForParcel] = useState<Parcel | null>(null);
+  const [receiverId, setReceiverId] = useState<string | null>(null);
+  const [recommendedSlots, setRecommendedSlots] = useState<TimeSlot[]>([]);
   
   useEffect(() => {
     const fetchData = async () => {
       try {
         setLoading(true);
         
-        // Fetch users if not already loaded
+        // Fetch all users (receivers)
         if (state.users.length === 0) {
           const users = await mockApi.getUsers();
           dispatch({ type: 'SET_USERS', payload: users });
-          
-          if (users.length > 0) {
-            setReceiverId(users[0].id);
-          }
         }
         
-        // Fetch parcels for this receiver
-        const parcels = await mockApi.getParcelsByReceiverId(receiverId);
+        // Fetch all parcels if no receiver is selected yet
+        const parcels = await mockApi.getParcels();
         dispatch({ type: 'SET_PARCELS', payload: parcels });
         
-        // Get recommended time slots
-        const slots = await mockApi.getRecommendedTimeSlots(receiverId);
-        setRecommendedSlots(slots);
+        // Set initial receiver to current logged-in user
+        if (user && !receiverId) {
+          setReceiverId(user.id);
+          
+          // Get recommended time slots for the current user
+          const slots = await mockApi.getRecommendedTimeSlots(user.id);
+          setRecommendedSlots(slots);
+        }
       } catch (error) {
         console.error('Failed to fetch data', error);
         toast({
@@ -53,19 +57,43 @@ const ReceiverModule = () => {
     };
     
     fetchData();
-  }, [dispatch, receiverId, toast]);
+  }, [dispatch, receiverId, toast, user]);
   
-  const handleUserChange = (userId: string) => {
-    setReceiverId(userId);
+  const handleReceiverChange = async (userId: string) => {
+    try {
+      setLoading(true);
+      setReceiverId(userId);
+      
+      // Get recommended time slots for the selected receiver
+      const slots = await mockApi.getRecommendedTimeSlots(userId);
+      setRecommendedSlots(slots);
+    } catch (error) {
+      console.error('Failed to load time slots', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to load recommended time slots.',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
+    }
   };
   
-  const pendingParcels = state.parcels.filter((p) => 
-    p.status === 'pending' && !p.acceptedTimeSlot && p.receiver.id === receiverId
-  );
+  const getParcelsForReceiver = (id: string | null) => {
+    if (!id) return { pending: [], scheduled: [] };
+    
+    const pending = state.parcels.filter(
+      (p) => p.receiver.id === id && p.status === 'pending' && !p.acceptedTimeSlot
+    );
+    
+    const scheduled = state.parcels.filter(
+      (p) => p.receiver.id === id && (p.acceptedTimeSlot || p.status !== 'pending')
+    );
+    
+    return { pending, scheduled };
+  };
   
-  const scheduledParcels = state.parcels.filter((p) => 
-    p.receiver.id === receiverId && (p.acceptedTimeSlot || p.status !== 'pending')
-  );
+  const { pending: pendingParcels, scheduled: scheduledParcels } = getParcelsForReceiver(receiverId);
   
   const handleSelectParcelForTimeSlot = (parcel: Parcel) => {
     setSelectingSlotForParcel(parcel);
@@ -76,7 +104,7 @@ const ReceiverModule = () => {
     
     try {
       setLoading(true);
-      const updatedParcel = await mockApi.updateParcelDeliverySlot(selectingSlotForParcel.id, timeSlot);
+      await mockApi.updateParcelDeliverySlot(selectingSlotForParcel.id, timeSlot);
       
       dispatch({ 
         type: 'UPDATE_DELIVERY_SLOT', 
@@ -121,22 +149,41 @@ const ReceiverModule = () => {
           </p>
         </div>
         
-        {/* User Selection */}
+        {/* Receiver Selection */}
         <Card className="mb-8 p-6">
-          <h2 className="text-lg font-medium mb-4">Selected Receiver</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            {state.users.map((user) => (
-              <div 
-                key={user.id}
-                className={`p-3 border rounded-md cursor-pointer transition-colors ${
-                  user.id === receiverId ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'
-                }`}
-                onClick={() => handleUserChange(user.id)}
-              >
-                <div className="font-medium">{user.name}</div>
-                <div className="text-sm">{user.email}</div>
-              </div>
-            ))}
+          <h2 className="text-lg font-medium mb-4">Select Receiver</h2>
+          <div className="overflow-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Address</TableHead>
+                  <TableHead>Action</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {state.users.map((user) => (
+                  <TableRow key={user.id} className={receiverId === user.id ? "bg-muted" : ""}>
+                    <TableCell className="font-medium">{user.name}</TableCell>
+                    <TableCell>{user.email}</TableCell>
+                    <TableCell>{user.address.city}, {user.address.state}</TableCell>
+                    <TableCell>
+                      <button
+                        onClick={() => handleReceiverChange(user.id)}
+                        className={`px-3 py-1 rounded-md ${
+                          user.id === receiverId 
+                            ? 'bg-primary text-primary-foreground' 
+                            : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
+                        }`}
+                      >
+                        {user.id === receiverId ? 'Selected' : 'Select'}
+                      </button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           </div>
         </Card>
         
@@ -161,7 +208,7 @@ const ReceiverModule = () => {
               onSelectTimeSlot={handleTimeSlotSelection}
             />
           </div>
-        ) : (
+        ) : receiverId ? (
           <Tabs defaultValue="pending">
             <TabsList className="mb-6">
               <TabsTrigger value="pending">
@@ -192,7 +239,7 @@ const ReceiverModule = () => {
                 <div className="text-center p-16 border rounded-lg">
                   <h3 className="text-xl font-medium mb-2">No Pending Parcels</h3>
                   <p className="text-muted-foreground">
-                    You don't have any parcels awaiting scheduling.
+                    There are no parcels awaiting scheduling for this receiver.
                   </p>
                 </div>
               )}
@@ -217,12 +264,19 @@ const ReceiverModule = () => {
                 <div className="text-center p-16 border rounded-lg">
                   <h3 className="text-xl font-medium mb-2">No Scheduled Parcels</h3>
                   <p className="text-muted-foreground">
-                    You don't have any scheduled or delivered parcels.
+                    There are no scheduled or delivered parcels for this receiver.
                   </p>
                 </div>
               )}
             </TabsContent>
           </Tabs>
+        ) : (
+          <div className="text-center p-16 border rounded-lg">
+            <h3 className="text-xl font-medium mb-2">Select a Receiver</h3>
+            <p className="text-muted-foreground">
+              Please select a receiver from the list above to view their parcels.
+            </p>
+          </div>
         )}
       </div>
     </div>
