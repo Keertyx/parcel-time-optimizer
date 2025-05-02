@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useToast } from '@/components/ui/use-toast';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,18 +10,25 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useParcelContext } from '@/context/ParcelContext';
 import { mockApi } from '@/services/mockApi';
 import { Person, Parcel } from '@/context/ParcelContext';
+import { User } from '@/context/AuthContext';
 
 interface ParcelFormProps {
   onSubmitSuccess?: () => void;
+  hideSenderForm?: boolean;
+  currentUser?: User | null;
 }
 
-const ParcelForm: React.FC<ParcelFormProps> = ({ onSubmitSuccess }) => {
+const ParcelForm: React.FC<ParcelFormProps> = ({ 
+  onSubmitSuccess, 
+  hideSenderForm = false,
+  currentUser = null 
+}) => {
   const { state, dispatch } = useParcelContext();
   const { toast } = useToast();
   
   const [senderSelected, setSenderSelected] = useState<Person | null>(null);
   const [receiverSelected, setReceiverSelected] = useState<Person | null>(null);
-  const [isNewSender, setIsNewSender] = useState(false);
+  const [isNewSender, setIsNewSender] = useState(!hideSenderForm);
   const [isNewReceiver, setIsNewReceiver] = useState(false);
   
   // Form data states
@@ -53,6 +60,29 @@ const ParcelForm: React.FC<ParcelFormProps> = ({ onSubmitSuccess }) => {
     height: '',
     description: '',
   });
+  
+  // When currentUser is provided, use it as the sender
+  useEffect(() => {
+    if (currentUser && hideSenderForm) {
+      // Create a sender from the current user
+      const userAsSender: Person = {
+        id: currentUser.id,
+        name: currentUser.name,
+        email: currentUser.email,
+        phone: '', // We don't have this in the User type
+        address: {
+          street: '',
+          city: '',
+          state: '',
+          postalCode: '',
+          country: 'USA'
+        }
+      };
+      
+      setSenderSelected(userAsSender);
+      setIsNewSender(false);
+    }
+  }, [currentUser, hideSenderForm]);
   
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -191,149 +221,151 @@ const ParcelForm: React.FC<ParcelFormProps> = ({ onSubmitSuccess }) => {
   
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-      <div className="grid md:grid-cols-2 gap-6">
-        {/* Sender Information */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Sender Information</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Tabs 
-              defaultValue={isNewSender ? "new" : "existing"}
-              onValueChange={(value) => setIsNewSender(value === "new")}
-            >
-              <TabsList className="grid grid-cols-2 mb-4">
-                <TabsTrigger value="existing">Existing Sender</TabsTrigger>
-                <TabsTrigger value="new">New Sender</TabsTrigger>
-              </TabsList>
-              
-              <TabsContent value="existing">
-                <div className="space-y-4">
-                  {state.users.length > 0 ? (
-                    <div className="grid grid-cols-1 gap-2">
-                      {state.users.map((user) => (
-                        <div 
-                          key={user.id}
-                          className={`p-3 border rounded-md cursor-pointer transition-colors ${
-                            senderSelected?.id === user.id ? "bg-primary text-primary-foreground" : "hover:bg-muted"
-                          }`}
-                          onClick={() => setSenderSelected(user)}
-                        >
-                          <div className="font-medium">{user.name}</div>
-                          <div className="text-sm">{user.email}</div>
-                          <div className="text-sm">{user.address.city}, {user.address.state}</div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-center p-4">
-                      <p>No existing users. Create a new sender.</p>
-                    </div>
-                  )}
-                </div>
-              </TabsContent>
-              
-              <TabsContent value="new">
-                <div className="space-y-3">
-                  <div className="grid gap-2">
-                    <Label htmlFor="senderName">Name</Label>
-                    <Input 
-                      id="senderName" 
-                      name="senderName" 
-                      value={formData.senderName} 
-                      onChange={handleChange} 
-                      required={isNewSender}
-                    />
+      <div className={`grid ${hideSenderForm ? '' : 'md:grid-cols-2'} gap-6`}>
+        {/* Sender Information - only show if not hidden */}
+        {!hideSenderForm && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Sender Information</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Tabs 
+                defaultValue={isNewSender ? "new" : "existing"}
+                onValueChange={(value) => setIsNewSender(value === "new")}
+              >
+                <TabsList className="grid grid-cols-2 mb-4">
+                  <TabsTrigger value="existing">Existing Sender</TabsTrigger>
+                  <TabsTrigger value="new">New Sender</TabsTrigger>
+                </TabsList>
+                
+                <TabsContent value="existing">
+                  <div className="space-y-4">
+                    {state.users.length > 0 ? (
+                      <div className="grid grid-cols-1 gap-2">
+                        {state.users.map((user) => (
+                          <div 
+                            key={user.id}
+                            className={`p-3 border rounded-md cursor-pointer transition-colors ${
+                              senderSelected?.id === user.id ? "bg-primary text-primary-foreground" : "hover:bg-muted"
+                            }`}
+                            onClick={() => setSenderSelected(user)}
+                          >
+                            <div className="font-medium">{user.name}</div>
+                            <div className="text-sm">{user.email}</div>
+                            <div className="text-sm">{user.address.city}, {user.address.state}</div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-center p-4">
+                        <p>No existing users. Create a new sender.</p>
+                      </div>
+                    )}
                   </div>
-                  
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <Label htmlFor="senderEmail">Email</Label>
+                </TabsContent>
+                
+                <TabsContent value="new">
+                  <div className="space-y-3">
+                    <div className="grid gap-2">
+                      <Label htmlFor="senderName">Name</Label>
                       <Input 
-                        id="senderEmail" 
-                        name="senderEmail" 
-                        type="email" 
-                        value={formData.senderEmail} 
+                        id="senderName" 
+                        name="senderName" 
+                        value={formData.senderName} 
                         onChange={handleChange} 
                         required={isNewSender}
                       />
                     </div>
+                    
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <Label htmlFor="senderEmail">Email</Label>
+                        <Input 
+                          id="senderEmail" 
+                          name="senderEmail" 
+                          type="email" 
+                          value={formData.senderEmail} 
+                          onChange={handleChange} 
+                          required={isNewSender}
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="senderPhone">Phone</Label>
+                        <Input 
+                          id="senderPhone" 
+                          name="senderPhone" 
+                          value={formData.senderPhone} 
+                          onChange={handleChange} 
+                          required={isNewSender}
+                        />
+                      </div>
+                    </div>
+                    
                     <div>
-                      <Label htmlFor="senderPhone">Phone</Label>
+                      <Label htmlFor="senderStreet">Street Address</Label>
                       <Input 
-                        id="senderPhone" 
-                        name="senderPhone" 
-                        value={formData.senderPhone} 
+                        id="senderStreet" 
+                        name="senderStreet" 
+                        value={formData.senderStreet} 
                         onChange={handleChange} 
                         required={isNewSender}
                       />
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <Label htmlFor="senderCity">City</Label>
+                        <Input 
+                          id="senderCity" 
+                          name="senderCity" 
+                          value={formData.senderCity} 
+                          onChange={handleChange} 
+                          required={isNewSender}
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="senderState">State</Label>
+                        <Input 
+                          id="senderState" 
+                          name="senderState" 
+                          value={formData.senderState} 
+                          onChange={handleChange} 
+                          required={isNewSender}
+                        />
+                      </div>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <Label htmlFor="senderPostalCode">Postal Code</Label>
+                        <Input 
+                          id="senderPostalCode" 
+                          name="senderPostalCode" 
+                          value={formData.senderPostalCode} 
+                          onChange={handleChange} 
+                          required={isNewSender}
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="senderCountry">Country</Label>
+                        <Input 
+                          id="senderCountry" 
+                          name="senderCountry" 
+                          value={formData.senderCountry} 
+                          onChange={handleChange} 
+                          required={isNewSender}
+                        />
+                      </div>
                     </div>
                   </div>
-                  
-                  <div>
-                    <Label htmlFor="senderStreet">Street Address</Label>
-                    <Input 
-                      id="senderStreet" 
-                      name="senderStreet" 
-                      value={formData.senderStreet} 
-                      onChange={handleChange} 
-                      required={isNewSender}
-                    />
-                  </div>
-                  
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <Label htmlFor="senderCity">City</Label>
-                      <Input 
-                        id="senderCity" 
-                        name="senderCity" 
-                        value={formData.senderCity} 
-                        onChange={handleChange} 
-                        required={isNewSender}
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="senderState">State</Label>
-                      <Input 
-                        id="senderState" 
-                        name="senderState" 
-                        value={formData.senderState} 
-                        onChange={handleChange} 
-                        required={isNewSender}
-                      />
-                    </div>
-                  </div>
-                  
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <Label htmlFor="senderPostalCode">Postal Code</Label>
-                      <Input 
-                        id="senderPostalCode" 
-                        name="senderPostalCode" 
-                        value={formData.senderPostalCode} 
-                        onChange={handleChange} 
-                        required={isNewSender}
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="senderCountry">Country</Label>
-                      <Input 
-                        id="senderCountry" 
-                        name="senderCountry" 
-                        value={formData.senderCountry} 
-                        onChange={handleChange} 
-                        required={isNewSender}
-                      />
-                    </div>
-                  </div>
-                </div>
-              </TabsContent>
-            </Tabs>
-          </CardContent>
-        </Card>
+                </TabsContent>
+              </Tabs>
+            </CardContent>
+          </Card>
+        )}
         
-        {/* Receiver Information */}
-        <Card>
+        {/* Receiver Information - always show */}
+        <Card className={hideSenderForm ? "max-w-xl mx-auto w-full" : ""}>
           <CardHeader>
             <CardTitle>Receiver Information</CardTitle>
           </CardHeader>
@@ -474,7 +506,7 @@ const ParcelForm: React.FC<ParcelFormProps> = ({ onSubmitSuccess }) => {
       </div>
       
       {/* Parcel Details */}
-      <Card>
+      <Card className={hideSenderForm ? "max-w-xl mx-auto w-full" : ""}>
         <CardHeader>
           <CardTitle>Parcel Details</CardTitle>
         </CardHeader>

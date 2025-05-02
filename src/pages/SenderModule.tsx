@@ -4,9 +4,11 @@ import { useParcelContext } from '@/context/ParcelContext';
 import { mockApi } from '@/services/mockApi';
 import ParcelForm from '@/components/ParcelForm';
 import LoadingSpinner from '@/components/LoadingSpinner';
+import { useAuth } from '@/context/AuthContext';
 
 const SenderModule = () => {
   const { state, dispatch } = useParcelContext();
+  const { user } = useAuth();
   
   useEffect(() => {
     const fetchData = async () => {
@@ -31,7 +33,7 @@ const SenderModule = () => {
         <div className="mb-8">
           <h1 className="text-3xl font-bold mb-2">Send a Parcel</h1>
           <p className="text-muted-foreground">
-            Fill out the form below to send a parcel. You can select existing users or create new ones.
+            Fill out the form below to send a parcel. As a logged-in sender, you only need to specify the receiver details.
           </p>
         </div>
         
@@ -40,7 +42,7 @@ const SenderModule = () => {
             <LoadingSpinner size={50} />
           </div>
         ) : (
-          <ParcelForm />
+          <ParcelForm hideSenderForm={true} currentUser={user} />
         )}
       </div>
     </div>
