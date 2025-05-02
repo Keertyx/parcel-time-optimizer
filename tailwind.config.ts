@@ -56,6 +56,10 @@ export default {
 				pending: 'hsl(var(--pending))',
 				inTransit: 'hsl(var(--in-transit))',
 				delivered: 'hsl(var(--delivered))',
+				// Auth page specific colors
+				authBg: '#f5f7fa',
+				authText: '#333333',
+				authBorder: '#e5e7eb',
 			},
 			borderRadius: {
 				lg: 'var(--radius)',
