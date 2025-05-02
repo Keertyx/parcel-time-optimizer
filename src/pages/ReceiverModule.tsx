@@ -1,11 +1,10 @@
-
 import React, { useState, useEffect } from 'react';
 import { useToast } from '@/components/ui/use-toast';
 import { Card } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useParcelContext } from '@/context/ParcelContext';
 import { mockApi } from '@/services/mockApi';
-import { Parcel, TimeSlot } from '@/context/ParcelContext';
+import { Parcel, TimeSlot, Person } from '@/context/ParcelContext';
 import ParcelCard from '@/components/ParcelCard';
 import TimeSlotSelector from '@/components/TimeSlotSelector';
 import LoadingSpinner from '@/components/LoadingSpinner';
@@ -20,6 +19,7 @@ const ReceiverModule = () => {
   const [selectingSlotForParcel, setSelectingSlotForParcel] = useState<Parcel | null>(null);
   const [receiverId, setReceiverId] = useState<string | null>(null);
   const [recommendedSlots, setRecommendedSlots] = useState<TimeSlot[]>([]);
+  const [currentUserAddedToReceivers, setCurrentUserAddedToReceivers] = useState(false);
   
   useEffect(() => {
     const fetchData = async () => {
@@ -27,12 +27,36 @@ const ReceiverModule = () => {
         setLoading(true);
         
         // Fetch all users (receivers)
-        if (state.users.length === 0) {
-          const users = await mockApi.getUsers();
-          dispatch({ type: 'SET_USERS', payload: users });
+        const users = await mockApi.getUsers();
+        
+        // Add current user to users list if not already present
+        if (user) {
+          const currentUserExists = users.some(u => u.id === user.id);
+          
+          if (!currentUserExists && !currentUserAddedToReceivers) {
+            // Create a mock user object for the current logged-in user if they're not in the list
+            const currentUserAsReceiver: Person = {
+              id: user.id,
+              name: user.name,
+              email: user.email,
+              phone: "N/A", // Placeholder as we don't have this in auth user
+              address: {
+                street: "N/A",
+                city: "N/A",
+                state: "N/A",
+                postalCode: "N/A",
+                country: "N/A"
+              }
+            };
+            
+            users.push(currentUserAsReceiver);
+            setCurrentUserAddedToReceivers(true);
+          }
         }
         
-        // Fetch all parcels if no receiver is selected yet
+        dispatch({ type: 'SET_USERS', payload: users });
+        
+        // Fetch all parcels
         const parcels = await mockApi.getParcels();
         dispatch({ type: 'SET_PARCELS', payload: parcels });
         
@@ -57,7 +81,7 @@ const ReceiverModule = () => {
     };
     
     fetchData();
-  }, [dispatch, receiverId, toast, user]);
+  }, [dispatch, receiverId, toast, user, currentUserAddedToReceivers]);
   
   const handleReceiverChange = async (userId: string) => {
     try {
@@ -92,8 +116,6 @@ const ReceiverModule = () => {
     
     return { pending, scheduled };
   };
-  
-  const { pending: pendingParcels, scheduled: scheduledParcels } = getParcelsForReceiver(receiverId);
   
   const handleSelectParcelForTimeSlot = (parcel: Parcel) => {
     setSelectingSlotForParcel(parcel);
