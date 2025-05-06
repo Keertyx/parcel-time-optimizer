@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useToast } from '@/components/ui/use-toast';
 import { Card } from '@/components/ui/card';
@@ -116,6 +117,9 @@ const ReceiverModule = () => {
     
     return { pending, scheduled };
   };
+  
+  // Get the pending and scheduled parcels for the selected receiver
+  const { pending: pendingParcels, scheduled: scheduledParcels } = getParcelsForReceiver(receiverId);
   
   const handleSelectParcelForTimeSlot = (parcel: Parcel) => {
     setSelectingSlotForParcel(parcel);
