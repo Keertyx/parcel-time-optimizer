@@ -2,7 +2,7 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
-import { Package, LogOut, User } from 'lucide-react';
+import { Package, Mail, LogOut, User } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 
 const Header: React.FC = () => {
@@ -28,7 +28,9 @@ const Header: React.FC = () => {
       <div className="container mx-auto py-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Package size={28} />
+            <div className="flex items-center justify-center bg-white rounded-full p-1.5">
+              <Mail size={24} className="text-primary" />
+            </div>
             <h1 className="text-xl font-bold">ParcelTime</h1>
           </div>
           

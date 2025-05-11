@@ -20,7 +20,18 @@ const TimeSlotSelector: React.FC<TimeSlotSelectorProps> = ({
   const [selectedTimeSlot, setSelectedTimeSlot] = useState<TimeSlot | null>(null);
   
   const next7Days = getNext7Days();
-  const customTimeSlots = selectedDate ? generateTimeSlots(selectedDate) : [];
+  
+  // Filter custom time slots to be between 10 AM and 5 PM (10:00-17:00)
+  const customTimeSlots = selectedDate ? 
+    generateTimeSlots(selectedDate, 10, 17) : 
+    [];
+  
+  // Filter out recommended slots that are outside the 10 AM to 5 PM timeframe
+  const filteredRecommendedSlots = recommendedSlots.filter(slot => {
+    const startHour = parseInt(slot.startTime.split(':')[0]);
+    const endHour = parseInt(slot.endTime.split(':')[0]);
+    return startHour >= 10 && endHour <= 17;
+  });
   
   const handleDateSelect = (date: Date) => {
     setSelectedDate(date);
@@ -32,8 +43,8 @@ const TimeSlotSelector: React.FC<TimeSlotSelectorProps> = ({
   };
   
   const handleConfirm = () => {
-    if (selectedTab === "recommended" && recommendedSlots.length > 0) {
-      onSelectTimeSlot(selectedTimeSlot || recommendedSlots[0]);
+    if (selectedTab === "recommended" && filteredRecommendedSlots.length > 0) {
+      onSelectTimeSlot(selectedTimeSlot || filteredRecommendedSlots[0]);
     } else if (selectedTab === "custom" && selectedTimeSlot) {
       onSelectTimeSlot(selectedTimeSlot);
     }
@@ -54,12 +65,12 @@ const TimeSlotSelector: React.FC<TimeSlotSelectorProps> = ({
         
         <TabsContent value="recommended" className="space-y-4">
           <div className="grid gap-4">
-            {recommendedSlots.length > 0 ? (
-              recommendedSlots.map((slot) => (
+            {filteredRecommendedSlots.length > 0 ? (
+              filteredRecommendedSlots.map((slot) => (
                 <Card 
                   key={slot.id}
                   className={`cursor-pointer transition-all ${
-                    (selectedTimeSlot?.id === slot.id || (!selectedTimeSlot && slot.id === recommendedSlots[0].id)) 
+                    (selectedTimeSlot?.id === slot.id || (!selectedTimeSlot && slot.id === filteredRecommendedSlots[0].id)) 
                     ? "border-primary" 
                     : ""
                   }`}
@@ -70,7 +81,7 @@ const TimeSlotSelector: React.FC<TimeSlotSelectorProps> = ({
                       {formatDate(slot.date)}
                     </CardTitle>
                     <CardDescription>
-                      AI recommended based on your past deliveries
+                      AI recommended based on your past deliveries (10 AM - 5 PM only)
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
@@ -82,7 +93,7 @@ const TimeSlotSelector: React.FC<TimeSlotSelectorProps> = ({
               ))
             ) : (
               <div className="text-center p-8">
-                <p>No recommended slots available.</p>
+                <p>No recommended slots available between 10 AM and 5 PM.</p>
               </div>
             )}
           </div>
@@ -92,7 +103,7 @@ const TimeSlotSelector: React.FC<TimeSlotSelectorProps> = ({
           <Card>
             <CardHeader>
               <CardTitle>Choose Your Delivery Date</CardTitle>
-              <CardDescription>Select a convenient day for delivery</CardDescription>
+              <CardDescription>Select a convenient day for delivery (10 AM - 5 PM only)</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="flex overflow-x-auto pb-2 mb-4 gap-2">
@@ -140,7 +151,7 @@ const TimeSlotSelector: React.FC<TimeSlotSelectorProps> = ({
         <Button 
           size="lg" 
           disabled={
-            (selectedTab === "recommended" && recommendedSlots.length === 0) || 
+            (selectedTab === "recommended" && filteredRecommendedSlots.length === 0) || 
             (selectedTab === "custom" && !selectedTimeSlot)
           }
           onClick={handleConfirm}
